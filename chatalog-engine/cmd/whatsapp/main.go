@@ -18,8 +18,14 @@ func main() {
 		panic(fmt.Sprintf("failed to setup whatsmeow client: %v", err))
 	}
 
+	db, err := setupSQLiteDatabase(config.SQLitePath)
+	if err != nil {
+		panic(fmt.Sprintf("failed to setup sqlite database: %v", err))
+	}
+
 	appContainer := app.SetupApp(app.SetupAppParams{
 		OpenAIToken: config.OpenAIToken,
+		DB:          db,
 	})
 	eventHandler := &EventHandler{
 		client:       client,
