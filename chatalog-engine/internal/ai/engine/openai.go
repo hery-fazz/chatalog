@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -74,6 +75,11 @@ func (e *OpenAIEngine) DetermineIntent(ctx context.Context, message string) (*ai
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("================================")
+	log.Printf("User Input: %s", message)
+	log.Printf("DetermineIntent: %s", resultIntent.Choices[0].Message.Content)
+	log.Printf("================================")
 
 	var resultIntentData ai.IntentResponse
 	err = json.Unmarshal([]byte(resultIntent.Choices[0].Message.Content), &resultIntentData)
@@ -197,8 +203,10 @@ func (e *OpenAIEngine) MatchProducts(ctx context.Context, productNames []string,
 	for _, p := range products {
 		availableProducts = append(availableProducts, fmt.Sprintf("%s (Rp %.0f)", p.Name, p.Price))
 	}
+	availableProductsStr := strings.Join(availableProducts, ", ")
+	productNamesStr := strings.Join(productNames, ", ")
 
-	prompt = fmt.Sprintf(prompt, strings.Join(availableProducts, ", "), strings.Join(productNames, ", "))
+	prompt = fmt.Sprintf(prompt, availableProductsStr, productNamesStr)
 	resultIntent, err := e.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage(prompt),
@@ -208,6 +216,12 @@ func (e *OpenAIEngine) MatchProducts(ctx context.Context, productNames []string,
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("================================")
+	log.Printf("Available Product: %s", availableProductsStr)
+	log.Printf("Product Names: %s", productNamesStr)
+	log.Printf("Match Product Result: %s", resultIntent.Choices[0].Message.Content)
+	log.Printf("================================")
 
 	var productResult []ai.Product
 	err = json.Unmarshal([]byte(resultIntent.Choices[0].Message.Content), &productResult)
