@@ -2,20 +2,27 @@ package engine
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/defryfazz/fazztalog/internal/ai"
+	"github.com/google/uuid"
 	"github.com/openai/openai-go"
 )
 
 type OpenAIEngine struct {
-	client openai.Client
+	client  openai.Client
+	tempDir string
 }
 
-func NewOpenAIEngine(client openai.Client) *OpenAIEngine {
+func NewOpenAIEngine(client openai.Client, tempDir string) *OpenAIEngine {
 	return &OpenAIEngine{
-		client: client,
+		client:  client,
+		tempDir: tempDir,
 	}
 }
 
@@ -57,4 +64,59 @@ func (e *OpenAIEngine) DetermineIntent(ctx context.Context, message string) (str
 	}
 
 	return resultIntent.Choices[0].Message.Content, nil
+}
+
+func (e *OpenAIEngine) GenerateBrochure(ctx context.Context, details ai.BrochureDetails) (string, error) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Design a clean, modern ecommerce brochure for brand “%s”. ", details.MerchantName)
+	fmt.Fprintf(&b, "Layout: square canvas, white or light background, soft shadows, neat grid. ")
+	fmt.Fprintf(&b, "Top header: brand logo (from provided logo reference) at left, brand name at right in bold sans-serif. ")
+	fmt.Fprintf(&b, "Products: show each product photo as the hero within rounded cards. Under each photo, show the product name and a clear price tag. ")
+	fmt.Fprintf(&b, "Use consistent spacing, balanced margins, and visual hierarchy. If backgrounds are messy, neatly cut out products. ")
+	fmt.Fprintf(&b, "Typography: clean sans-serif; prices visually prominent; include subtle accents.\n\n")
+
+	fmt.Fprintf(&b, "Products to include (name → price):\n")
+	for _, p := range details.Products {
+		fmt.Fprintf(&b, "• %s → Rp %.0f\n", p.Name, p.Price)
+	}
+
+	fmt.Fprintf(&b, "\nDesign constraints:\n")
+	fmt.Fprintf(&b, "- Arrange items in 2–3 columns depending on count; keep even gutters.\n")
+	fmt.Fprintf(&b, "- Preserve product aspect ratios; avoid warping logos or products.\n")
+	fmt.Fprintf(&b, "- Include small footer with “%s” and social placeholders.\n", details.MerchantName)
+	fmt.Fprintf(&b, "- Export PNG with transparent background where possible.\n")
+
+	prompt := b.String()
+
+	res, err := e.client.Images.Generate(ctx, openai.ImageGenerateParams{
+		Model:  openai.ImageModelGPTImage1,
+		Prompt: prompt,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if res.Data[0].URL != "" {
+		return res.Data[0].URL, nil
+	}
+	if res.Data[0].B64JSON != "" {
+		data, err := base64.StdEncoding.DecodeString(res.Data[0].B64JSON)
+		if err != nil {
+			return "", err
+		}
+
+		tmpDir := fmt.Sprintf("%s/openai", e.tempDir)
+		if err := os.MkdirAll(tmpDir, 0755); err != nil {
+			return "", err
+		}
+
+		out := filepath.Join(tmpDir, uuid.New().String()+".png")
+		if err := os.WriteFile(out, data, 0o644); err != nil {
+			return "", err
+		}
+
+		return out, nil
+	}
+
+	return res.Data[0].URL, nil
 }

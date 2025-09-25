@@ -12,14 +12,15 @@ type AppContainer struct {
 }
 
 type SetupAppParams struct {
-	OpenAIToken string
+	OpenAIToken   string
+	TempDirectory string
 }
 
 func SetupApp(params SetupAppParams) AppContainer {
 	client := openai.NewClient(
 		option.WithAPIKey(params.OpenAIToken),
 	)
-	aiEngine := engine.NewOpenAIEngine(client)
+	aiEngine := engine.NewOpenAIEngine(client, params.TempDirectory)
 
 	return AppContainer{
 		AIEngine: aiEngine,
