@@ -1,12 +1,14 @@
 package app
 
 import (
+	"github.com/defryfazz/fazztalog/internal/ai"
+	"github.com/defryfazz/fazztalog/internal/ai/engine"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 )
 
 type AppContainer struct {
-	OpenAIClient openai.Client
+	AIEngine ai.Engine
 }
 
 type SetupAppParams struct {
@@ -17,8 +19,9 @@ func SetupApp(params SetupAppParams) AppContainer {
 	client := openai.NewClient(
 		option.WithAPIKey(params.OpenAIToken),
 	)
+	aiEngine := engine.NewOpenAIEngine(client)
 
 	return AppContainer{
-		OpenAIClient: client,
+		AIEngine: aiEngine,
 	}
 }

@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/defryfazz/fazztalog/config"
+	"github.com/defryfazz/fazztalog/internal/ai"
 	"github.com/defryfazz/fazztalog/internal/app"
 	"github.com/google/uuid"
-	"github.com/openai/openai-go"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types/events"
@@ -64,19 +64,30 @@ func (h *EventHandler) Handle(ctx context.Context) whatsmeow.EventHandler {
 				}
 				defer ff.Close()
 
-				res, err := h.appContainer.OpenAIClient.Audio.Transcriptions.New(ctx, openai.AudioTranscriptionNewParams{
-					Model: openai.AudioModelWhisper1,
-					File:  ff,
-				})
+				textMessage, err = h.appContainer.AIEngine.TranscribeAudio(ctx, ff)
 				if err != nil {
 					log.Printf("error transcripting audio: %v\n", err)
 					return
 				}
-
-				textMessage = res.Text
 			}
 
 			if textMessage == "" {
+				return
+			}
+
+			intent, err := h.appContainer.AIEngine.DetermineIntent(ctx, textMessage)
+			if err != nil {
+				log.Printf("error determining intent: %v\n", err)
+				return
+			}
+			if intent != string(ai.IntentBrochureGeneration) {
+				_, err = h.client.SendMessage(ctx, v.Info.Chat, &waE2E.Message{
+					Conversation: proto.String("Sorry, I can't help you with that. I can only assist with brochure generation requests."),
+				})
+				if err != nil {
+					log.Printf("error sending response message: %v\n", err)
+					return
+				}
 				return
 			}
 
