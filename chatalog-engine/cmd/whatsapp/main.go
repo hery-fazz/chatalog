@@ -24,8 +24,9 @@ func main() {
 	}
 
 	appContainer := app.SetupApp(app.SetupAppParams{
-		OpenAIToken: config.OpenAIToken,
-		DB:          db,
+		OpenAIToken:   config.OpenAIToken,
+		DB:            db,
+		TempDirectory: config.TempFolderPath,
 	})
 	eventHandler := &EventHandler{
 		client:       client,
