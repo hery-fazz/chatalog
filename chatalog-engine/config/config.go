@@ -15,7 +15,6 @@ func init() {
 	once.Do(func() {
 		TempFolderPath = getString("TEMP_FOLDER_PATH", "")
 		WhatsmeowSQLPath = getString("WHATSMEOW_SQL_PATH", "")
-
 		OpenAIToken = getString("OPEN_AI_TOKEN", "")
 	})
 }

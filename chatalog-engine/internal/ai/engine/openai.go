@@ -2,8 +2,12 @@ package engine
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/defryfazz/fazztalog/internal/ai"
 	"github.com/openai/openai-go"
@@ -57,4 +61,61 @@ func (e *OpenAIEngine) DetermineIntent(ctx context.Context, message string) (str
 	}
 
 	return resultIntent.Choices[0].Message.Content, nil
+}
+
+func (e *OpenAIEngine) GenerateBrochureImage(ctx context.Context, userMessage string) (string, string, error) {
+	sys := `You are a graphic designer generating a clean Indonesian promo poster.
+			- Keep layout simple, high contrast, readable big title and price.
+			- Fit for WhatsApp sharing. No watermark. No NSFW.`
+
+	userPrompt := fmt.Sprintf(
+			"Buat poster promosi berdasarkan instruksi ini (Bahasa Indonesia): %s\n"+
+			"Fokuskan pada judul promo, harga, 2–3 bullet benefit, dan tone warna berkontras tinggi.",
+		userMessage,
+	)
+
+	captionResp, err := e.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModelGPT4oMini,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage("Tuliskan caption WA yang singkat dan ramah untuk menyertai poster, maksimal 140 karakter."),
+			openai.UserMessage(userMessage),
+		},
+	})
+	if err != nil {
+		return "", "", err
+	}
+	caption := strings.TrimSpace(captionResp.Choices[0].Message.Content)
+	if caption == "" {
+		caption = "Siap! Berikut poster promonya 🚀"
+	}
+
+	img, err := e.client.Images.Generate(ctx, openai.ImageGenerateParams{
+		Model:  openai.ImageModelGPTImage1,      
+		Prompt: sys + "\n\n" + userPrompt,        
+		Size:   "1024x1024",                     
+	})
+	if err != nil {
+		return "", "", err
+	}
+	if len(img.Data) == 0 {
+		return "", "", fmt.Errorf("no image returned")
+	}
+
+	if img.Data[0].URL != "" {
+		return img.Data[0].URL, caption, nil
+	}
+	if img.Data[0].B64JSON != "" {
+		data, err := base64.StdEncoding.DecodeString(img.Data[0].B64JSON)
+		if err != nil {
+			return "", "", err
+		}
+		tmpDir := os.TempDir()
+		out := filepath.Join(tmpDir, "chatalog_poster.jpg")
+		if err := os.WriteFile(out, data, 0o644); err != nil {
+			return "", "", err
+		}
+		return out, caption, nil
+	}
+
+	return "", "", fmt.Errorf("image has neither URL nor base64 data")
 }
