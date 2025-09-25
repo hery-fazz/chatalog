@@ -80,6 +80,8 @@ func (h *EventHandler) Handle(ctx context.Context) whatsmeow.EventHandler {
 				return
 			}
 
+			// todo: Process message here (generate image)
+
 			_, err = h.client.SendMessage(ctx, v.Info.Chat, &waE2E.Message{
 				Conversation: proto.String("Hi, you said: " + textMessage),
 			})
