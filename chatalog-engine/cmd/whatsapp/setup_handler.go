@@ -87,7 +87,7 @@ func (h *EventHandler) Handle(ctx context.Context) whatsmeow.EventHandler {
 				log.Printf("error determining intent: %v\n", err)
 				return
 			}
-			if intent != string(ai.IntentBrochureGeneration) {
+			if intent.Intent != string(ai.IntentBrochureGeneration) {
 				_, err = h.client.SendMessage(ctx, v.Info.Chat, &waE2E.Message{
 					Conversation: proto.String("Sorry, I can't help you with that. I can only assist with brochure generation requests."),
 				})
@@ -101,7 +101,7 @@ func (h *EventHandler) Handle(ctx context.Context) whatsmeow.EventHandler {
 			h.client.SendMessage(ctx, v.Info.Chat, &waE2E.Message{
 				Conversation: proto.String("`Generating brochure...`"),
 			})
-			filePath, err := h.appContainer.MerchantService.GenerateBrochure(ctx, getPhoneFromJID(v.Info.Sender.ToNonAD().String()))
+			filePath, err := h.appContainer.MerchantService.GenerateBrochure(ctx, getPhoneFromJID(v.Info.Sender.ToNonAD().String()), intent.Products)
 			if err != nil {
 				log.Printf("error generating brochure: %v\n", err)
 				h.client.SendMessage(ctx, v.Info.Chat, &waE2E.Message{

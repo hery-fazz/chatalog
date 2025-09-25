@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -39,18 +40,28 @@ func (e *OpenAIEngine) TranscribeAudio(ctx context.Context, file io.Reader) (str
 	return res.Text, nil
 }
 
-func (e *OpenAIEngine) DetermineIntent(ctx context.Context, message string) (string, error) {
+func (e *OpenAIEngine) DetermineIntent(ctx context.Context, message string) (*ai.IntentResponse, error) {
 	prompt := `
 		You are an assistant that extracts user intent from input.
 		There are several intents available:
 		- %s: Brochure generation. This intent is used when the user wants to create a brochure for a product or service.
 		- %s: Unknown. This intent is used when the user's intent is not listed in available list.
 
+		IMPORTANT:
+		- If the user input does not match any of the available intents, you must choose "unknown".
+		- You must only choose one from the available intents.
+		- If the intent is brochure generation, you must get the product's names from the message. If there is no product, just return an empty list.
+
 		Based on the user input, determine the user's intent from the available list. Remember to only choose one from the available intents. If the user's intent is not listed, choose "unknown".
+		Always return with correct JSON format without any \n or \t
 
 		Example input and output:
-		Input: I want to create a brochure for my new product.
-		Output: brochure_generation
+		- Input: I want to create a brochure for my new product.
+		  Output: {"intent": "brochure_generation","products": []}
+		- Input: Please help to create a brochure for Fried Chicken and Coke.
+		  Output: {"intent": "brochure_generation","products": ["Fried Chicken", "Coke"]}
+		- Input: Hello, how are you?
+		  Output: {"intent": "unknown","products": []}
 	`
 
 	resultIntent, err := e.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
@@ -61,10 +72,16 @@ func (e *OpenAIEngine) DetermineIntent(ctx context.Context, message string) (str
 		Model: openai.ChatModelGPT4o,
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return resultIntent.Choices[0].Message.Content, nil
+	var resultIntentData ai.IntentResponse
+	err = json.Unmarshal([]byte(resultIntent.Choices[0].Message.Content), &resultIntentData)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resultIntentData, nil
 }
 
 func (e *OpenAIEngine) GenerateBrochure(ctx context.Context, details ai.BrochureDetails) (string, error) {
@@ -143,4 +160,60 @@ func (e *OpenAIEngine) GenerateBrochure(ctx context.Context, details ai.Brochure
 	}
 
 	return res.Data[0].URL, nil
+}
+
+func (e *OpenAIEngine) MatchProducts(ctx context.Context, productNames []string, products []ai.Product) ([]ai.Product, error) {
+	prompt := `
+		You are an assistant that finds product data by name. The selected product items may not match the exact names in the product, so you need to find the closest match using the product name.
+
+            These are the available product items:
+            "%s"
+
+            Selected product item(s):
+            "%s"
+            
+            For each selected item, check both the product name to find the closest match. If there is no exact match, choose the most similar item by name.
+			Always return in JSON array format without any \n or \t.
+
+			If the product item does not exist, return an empty list.
+
+			Example input and output:
+			- Input:
+				Available product items:
+					"Fried Chicken (Rp 20000), Coke (Rp 10000), Fries (Rp 15000)"
+				Selected product item(s):
+					"Fried Chicken, Coke"
+				Output:[{"name": "Fried Chicken", "price": 20000},{"name": "Coke", "price": 10000}]
+			- Input:
+				Available product items:
+					"Fried Chicken (Rp 20000), Coke (Rp 10000), Fries (Rp 15000)"
+				Selected product item(s):
+					"Pizza, Salad"
+				Output:
+					[]
+	`
+
+	availableProducts := make([]string, 0, len(products))
+	for _, p := range products {
+		availableProducts = append(availableProducts, fmt.Sprintf("%s (Rp %.0f)", p.Name, p.Price))
+	}
+
+	prompt = fmt.Sprintf(prompt, strings.Join(availableProducts, ", "), strings.Join(productNames, ", "))
+	resultIntent, err := e.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage(prompt),
+		},
+		Model: openai.ChatModelGPT4o,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var productResult []ai.Product
+	err = json.Unmarshal([]byte(resultIntent.Choices[0].Message.Content), &productResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return productResult, nil
 }

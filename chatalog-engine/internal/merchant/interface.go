@@ -3,7 +3,7 @@ package merchant
 import "context"
 
 type Service interface {
-	GenerateBrochure(ctx context.Context, merchantPhone string) (string, error)
+	GenerateBrochure(ctx context.Context, merchantPhone string, productNames []string) (string, error)
 }
 
 type Repository interface {

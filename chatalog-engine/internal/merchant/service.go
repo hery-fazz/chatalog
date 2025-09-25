@@ -18,7 +18,7 @@ func NewService(repo Repository, aiEngine ai.Engine) Service {
 	}
 }
 
-func (s *service) GenerateBrochure(ctx context.Context, merchantPhone string) (string, error) {
+func (s *service) GenerateBrochure(ctx context.Context, merchantPhone string, productNames []string) (string, error) {
 	merchant, err := s.repo.GetMerchantByPhone(ctx, merchantPhone)
 	if err != nil {
 		return "", err
@@ -36,6 +36,14 @@ func (s *service) GenerateBrochure(ctx context.Context, merchantPhone string) (s
 			Price: p.Price,
 		})
 	}
+
+	if len(productNames) > 0 {
+		aiProducts, err = s.aiEngine.MatchProducts(ctx, productNames, aiProducts)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	brochureDetails := ai.BrochureDetails{
 		MerchantName: merchant.Name,
 		Products:     aiProducts,
