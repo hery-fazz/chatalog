@@ -1,6 +1,9 @@
 package config
 
-import "sync"
+import (
+	"log"
+	"sync"
+)
 
 var (
 	once sync.Once
@@ -19,5 +22,11 @@ func init() {
 		SQLitePath = getString("SQLITE_PATH", "")
 
 		OpenAIToken = getString("OPEN_AI_TOKEN", "")
+
+		log.Println("Configuration loaded")
+		log.Printf("TempFolderPath: %s\n", TempFolderPath)
+		log.Printf("WhatsmeowSQLPath: %s\n", WhatsmeowSQLPath)
+		log.Printf("SQLitePath: %s\n", SQLitePath)
+		log.Printf("OpenAIToken: %s\n", OpenAIToken)
 	})
 }
