@@ -1,0 +1,11 @@
+{
+  "name": "chatalog",
+  "private": true,
+  "workspaces": ["chatalog-web", "packages/*"],
+  "scripts": {
+    "dev": "npm run -w @chatalog/web dev",
+    "build": "npm run -w @chatalog/web build",
+    "pages:build": "npm run -w @chatalog/web pages:build",
+    "pages:dev": "npm run -w @chatalog/web pages:dev"
+  }
+}
