@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,7 +98,30 @@ func (e *OpenAIEngine) GenerateBrochure(ctx context.Context, details ai.Brochure
 	}
 
 	if res.Data[0].URL != "" {
-		return res.Data[0].URL, nil
+		tmpDir := fmt.Sprintf("%s/openai", e.tempDir)
+		if err := os.MkdirAll(tmpDir, 0755); err != nil {
+			return "", err
+		}
+		out := filepath.Join(tmpDir, uuid.New().String()+".png")
+
+		// Use net/http to download the image
+		resp, err := http.Get(res.Data[0].URL)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+
+		f, err := os.Create(out)
+		if err != nil {
+			return "", err
+		}
+		defer f.Close()
+
+		if _, err := io.Copy(f, resp.Body); err != nil {
+			return "", err
+		}
+
+		return out, nil
 	}
 	if res.Data[0].B64JSON != "" {
 		data, err := base64.StdEncoding.DecodeString(res.Data[0].B64JSON)
