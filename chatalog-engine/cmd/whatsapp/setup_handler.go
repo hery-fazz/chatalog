@@ -128,6 +128,7 @@ func (h *EventHandler) authenticateSender(evt *events.Message) error {
 		"6285224416325", // Hery
 		"6282148924797", // Farrel
 		"6281575749888", // Nurwanto
+		"6281287456169", // Alex
 	}
 
 	senderJID := evt.Info.Sender.ToNonAD().String()
